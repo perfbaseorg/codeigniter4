@@ -1,0 +1,74 @@
+name: Compatibility Probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeigniter4-compat-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compatibility:
+    name: PHP ${{ matrix.php }} / CodeIgniter ${{ matrix.framework }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - php: '8.2'
+            framework: '4.3.8'
+            ignore_php_platform: false
+          - php: '8.2'
+            framework: '4.4.8'
+            ignore_php_platform: false
+          - php: '8.2'
+            framework: '4.5.8'
+            ignore_php_platform: false
+          - php: '8.2'
+            framework: '4.6.5'
+            ignore_php_platform: false
+          - php: '8.4'
+            framework: '4.7.2'
+            ignore_php_platform: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Checkout local Perfbase PHP SDK
+        uses: actions/checkout@v4
+        with:
+          repository: perfbaseorg/php-sdk
+          path: lib-php-sdk-src
+
+      - name: Link sibling SDK checkout
+        run: ln -s "$GITHUB_WORKSPACE/lib-php-sdk-src" "$GITHUB_WORKSPACE/../lib-php-sdk"
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+          tools: composer
+          extensions: pcntl
+
+      - name: Install dependencies
+        run: |
+          composer config audit.block-insecure false
+          composer require --no-interaction --no-progress --no-update codeigniter4/framework:${{ matrix.framework }}
+          composer update \
+            --with-all-dependencies \
+            --prefer-dist \
+            --no-progress \
+            --no-interaction \
+            ${{ matrix.ignore_php_platform && '--ignore-platform-req=php' || '' }} \
+            codeigniter4/framework
+
+      - name: Run PHPStan
+        run: composer run phpstan
+
+      - name: Run PHPUnit
+        run: composer run test -- --no-coverage --do-not-fail-on-risky

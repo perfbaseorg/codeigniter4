@@ -1,0 +1,49 @@
+name: PHP CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeigniter4-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  php-tests:
+    name: PHP 8.2 / CodeIgniter 4.3
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Checkout local Perfbase PHP SDK
+        uses: actions/checkout@v4
+        with:
+          repository: perfbaseorg/php-sdk
+          path: lib-php-sdk-src
+
+      - name: Link sibling SDK checkout
+        run: ln -s "$GITHUB_WORKSPACE/lib-php-sdk-src" "$GITHUB_WORKSPACE/../lib-php-sdk"
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: pcov
+          tools: composer
+          extensions: pcntl
+
+      - name: Install dependencies
+        run: composer update --with-all-dependencies --prefer-dist --no-progress --no-interaction codeigniter4/framework:^4.3.8
+
+      - name: Run PHPStan
+        run: composer run phpstan
+
+      - name: Run PHPUnit
+        run: composer run test -- --coverage-text

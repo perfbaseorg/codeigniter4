@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+WORKSPACE_ROOT="$(cd "${REPO_ROOT}/.." && pwd)"
+
+PHP_VERSION="${PHP_VERSION:-8.2}"
+FRAMEWORK_VERSION="${FRAMEWORK_VERSION:-4.6.5}"
+RUN_PHPSTAN=1
+RUN_TESTS=1
+REBUILD_IMAGE=1
+IGNORE_PHP_PLATFORM=0
+
+usage() {
+    cat <<'EOF'
+Usage: bin/test-compat [options]
+
+Options:
+  --php <version>              PHP version for the container image. Default: 8.2
+  --framework <version>        CodeIgniter framework version to install. Default: 4.6.5
+  --skip-phpstan               Skip PHPStan.
+  --skip-tests                 Skip PHPUnit.
+  --ignore-php-platform        Run Composer with --ignore-platform-req=php.
+  --no-build                   Reuse an existing compatibility image.
+  --help                       Show this help text.
+
+Examples:
+  bin/test-compat --php 8.1 --framework 4.3.8 --ignore-php-platform
+  bin/test-compat --php 8.2 --framework 4.5.8
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --php)
+            PHP_VERSION="$2"
+            shift 2
+            ;;
+        --framework)
+            FRAMEWORK_VERSION="$2"
+            shift 2
+            ;;
+        --skip-phpstan)
+            RUN_PHPSTAN=0
+            shift
+            ;;
+        --skip-tests)
+            RUN_TESTS=0
+            shift
+            ;;
+        --ignore-php-platform)
+            IGNORE_PHP_PLATFORM=1
+            shift
+            ;;
+        --no-build)
+            REBUILD_IMAGE=0
+            shift
+            ;;
+        --help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            usage >&2
+            exit 1
+            ;;
+    esac
+done
+
+IMAGE_TAG="perfbase-codeigniter4-compat:php-${PHP_VERSION//./-}"
+CONFIGURE_COMMAND="composer config audit.block-insecure false"
+REQUIRE_COMMAND="composer require --no-interaction --no-progress --no-update codeigniter4/framework:${FRAMEWORK_VERSION}"
+UPDATE_COMMAND="composer update --with-all-dependencies --prefer-dist --no-progress --no-interaction"
+
+if [[ "${IGNORE_PHP_PLATFORM}" -eq 1 ]]; then
+    UPDATE_COMMAND="${UPDATE_COMMAND} --ignore-platform-req=php"
+fi
+
+COMMANDS=("${CONFIGURE_COMMAND}" "${REQUIRE_COMMAND}" "${UPDATE_COMMAND} codeigniter4/framework")
+
+if [[ "${RUN_PHPSTAN}" -eq 1 ]]; then
+    COMMANDS+=("composer run phpstan")
+fi
+
+if [[ "${RUN_TESTS}" -eq 1 ]]; then
+    COMMANDS+=("composer run test -- --no-coverage --do-not-fail-on-risky")
+fi
+
+COMMAND_STRING="$(printf '%s && ' "${COMMANDS[@]}")"
+COMMAND_STRING="${COMMAND_STRING% && }"
+
+if [[ "${REBUILD_IMAGE}" -eq 1 ]]; then
+    docker build \
+        --build-arg "PHP_VERSION=${PHP_VERSION}" \
+        --file "${REPO_ROOT}/docker/compat/Dockerfile" \
+        --tag "${IMAGE_TAG}" \
+        "${REPO_ROOT}"
+fi
+
+DOCKER_FLAGS=(--rm)
+
+if [[ -t 0 && -t 1 ]]; then
+    DOCKER_FLAGS+=(-it)
+fi
+
+docker run "${DOCKER_FLAGS[@]}" \
+    --volume "${WORKSPACE_ROOT}:/workspace" \
+    --workdir /workspace/lib-codeigniter4 \
+    "${IMAGE_TAG}" \
+    bash -lc "${COMMAND_STRING}"

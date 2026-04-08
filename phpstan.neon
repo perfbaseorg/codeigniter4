@@ -1,0 +1,9 @@
+parameters:
+    level: 5
+    paths:
+        - src
+        - tests
+    bootstrapFiles:
+        - tools/phpstan/bootstrap.php
+    parallel:
+        maximumNumberOfProcesses: 1

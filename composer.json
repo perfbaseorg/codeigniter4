@@ -1,0 +1,61 @@
+{
+  "name": "perfbase/codeigniter4",
+  "description": "CodeIgniter 4 integration for the Perfbase profiling tool.",
+  "keywords": [
+    "Perfbase",
+    "codeigniter",
+    "codeigniter4",
+    "profiling",
+    "apm",
+    "monitoring"
+  ],
+  "homepage": "https://github.com/perfbaseorg/codeigniter4",
+  "support": {
+    "issues": "https://github.com/perfbaseorg/codeigniter4/issues",
+    "source": "https://github.com/perfbaseorg/codeigniter4"
+  },
+  "suggest": {
+    "codeigniter4/shield": "Optional. Used for first-class authenticated user resolution."
+  },
+  "type": "library",
+  "license": "Apache-2.0",
+  "authors": [
+    {
+      "name": "Ben Poulson",
+      "email": "ben.poulson@perfbase.com"
+    }
+  ],
+  "require": {
+    "php": ">=8.2 <8.5",
+    "codeigniter4/framework": "^4.3.8",
+    "perfbase/php-sdk": "^1.0"
+  },
+  "require-dev": {
+    "mockery/mockery": "^1.6",
+    "phpstan/phpstan": "^2.1",
+    "phpunit/phpunit": "^11.5"
+  },
+  "autoload": {
+    "psr-4": {
+      "Perfbase\\CodeIgniter4\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Perfbase\\CodeIgniter4\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "lint": "composer run-script phpstan && composer run-script test",
+    "test": "phpunit",
+    "phpstan": "phpstan analyse --memory-limit=2G --debug"
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "config": {
+    "sort-packages": true,
+    "audit": {
+      "block-insecure": false
+    }
+  }
+}
