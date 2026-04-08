@@ -39,8 +39,11 @@ jobs:
           tools: composer
           extensions: pcntl
 
+      - name: Pin CodeIgniter 4.3
+        run: composer require --no-update codeigniter4/framework:^4.3.8
+
       - name: Install dependencies
-        run: composer update --with-all-dependencies --prefer-dist --no-progress --no-interaction codeigniter4/framework:^4.3.8
+        run: composer update --prefer-dist --no-progress --no-interaction
 
       - name: Run PHPStan
         run: composer run phpstan
