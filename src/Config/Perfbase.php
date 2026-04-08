@@ -13,7 +13,7 @@ class Perfbase extends BaseConfig
     public bool $debug = false;
     public bool $logErrors = true;
     public string $apiKey = '';
-    public string $apiUrl = 'https://receiver.perfbase.com';
+    public string $apiUrl = 'https://ingress.perfbase.cloud';
     public float $sampleRate = 0.1;
     public int $timeout = 10;
     public ?string $proxy = null;

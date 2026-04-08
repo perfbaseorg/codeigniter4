@@ -29,7 +29,7 @@ final class PerfbaseConfigTest extends TestCase
         self::assertFalse($config->enabled);
         self::assertFalse($config->debug);
         self::assertTrue($config->logErrors);
-        self::assertSame('https://receiver.perfbase.com', $config->apiUrl);
+        self::assertSame('https://ingress.perfbase.cloud', $config->apiUrl);
         self::assertSame(0.1, $config->sampleRate);
         self::assertSame(['*'], $config->includeHttp);
         self::assertSame([], $config->excludeConsole);
