@@ -10,12 +10,18 @@ use CodeIgniter\Events\Events;
 class PerfbaseCommands extends Commands
 {
     /**
+     * Mirrors CodeIgniter's Commands::run() behavior as closely as possible
+     * while adding Perfbase-specific lifecycle events. If the supported
+     * framework floor changes, compare this method against the upstream
+     * implementation again before modifying it.
+     *
      * @param array<int|string, string|null> $params
+     * @return int|void
      */
     public function run(string $command, array $params)
     {
         if (!$this->verifyCommand($command, $this->commands)) {
-            return EXIT_ERROR;
+            return;
         }
 
         $className = $this->commands[$command]['class'];

@@ -12,11 +12,44 @@ use PHPUnit\Framework\TestCase;
 
 final class PerfbaseCommandsTest extends TestCase
 {
-    public function testRunReturnsErrorForUnknownCommand(): void
+    public function testRunMatchesNativeBehaviorForUnknownCommand(): void
     {
-        $commands = new PerfbaseCommands(service('logger'));
+        $commands = new class (service('logger')) extends PerfbaseCommands {
+            public bool $verifyCalled = false;
 
-        self::assertSame(EXIT_ERROR, $commands->run('missing:command', []));
+            public function verifyCommand(string $command, array $commands): bool
+            {
+                $this->verifyCalled = true;
+
+                return false;
+            }
+        };
+        $nativePreCalled = false;
+        $nativePostCalled = false;
+        $perfbasePreCalled = false;
+        $perfbasePostCalled = false;
+
+        Events::on('pre_command', static function () use (&$nativePreCalled): void {
+            $nativePreCalled = true;
+        });
+        Events::on('post_command', static function () use (&$nativePostCalled): void {
+            $nativePostCalled = true;
+        });
+        Events::on('perfbase_pre_command', static function () use (&$perfbasePreCalled): void {
+            $perfbasePreCalled = true;
+        });
+        Events::on('perfbase_post_command', static function () use (&$perfbasePostCalled): void {
+            $perfbasePostCalled = true;
+        });
+
+        $result = $commands->run('missing:command', []);
+
+        self::assertTrue($commands->verifyCalled);
+        self::assertTrue($result === null);
+        self::assertFalse($nativePreCalled);
+        self::assertFalse($nativePostCalled);
+        self::assertFalse($perfbasePreCalled);
+        self::assertFalse($perfbasePostCalled);
     }
 
     public function testRunPreservesNativeEventsAndAddsPerfbaseEventsForSuccess(): void
@@ -71,9 +104,13 @@ final class PerfbaseCommandsTest extends TestCase
             ],
         ]);
 
+        $nativePreCalled = false;
         $nativePostCalled = false;
         $perfbasePostArgs = null;
 
+        Events::on('pre_command', static function () use (&$nativePreCalled): void {
+            $nativePreCalled = true;
+        });
         Events::on('post_command', static function () use (&$nativePostCalled): void {
             $nativePostCalled = true;
         });
@@ -86,6 +123,7 @@ final class PerfbaseCommandsTest extends TestCase
         try {
             $commands->run('test:fail', []);
         } finally {
+            self::assertTrue($nativePreCalled);
             self::assertFalse($nativePostCalled);
             self::assertIsArray($perfbasePostArgs);
             self::assertSame('test:fail', $perfbasePostArgs[0]);

@@ -14,22 +14,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  php-tests:
-    name: PHP 8.2 / CodeIgniter 4.3
+  floor:
+    name: PHP 8.2 / CodeIgniter 4.3.8
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Checkout local Perfbase PHP SDK
-        uses: actions/checkout@v4
-        with:
-          repository: perfbaseorg/php-sdk
-          path: lib-php-sdk-src
-
-      - name: Link sibling SDK checkout
-        run: ln -s "$GITHUB_WORKSPACE/lib-php-sdk-src" "$GITHUB_WORKSPACE/../lib-php-sdk"
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
@@ -50,3 +41,31 @@ jobs:
 
       - name: Run PHPUnit
         run: composer run test -- --coverage-text
+
+  upper-bound:
+    name: PHP 8.4 / CodeIgniter 4.7.2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+          tools: composer
+          extensions: pcntl
+
+      - name: Pin CodeIgniter 4.7.2
+        run: composer require --no-update codeigniter4/framework:4.7.2
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-progress --no-interaction
+
+      - name: Run PHPStan
+        run: composer run phpstan
+
+      - name: Run PHPUnit
+        run: composer run test -- --no-coverage --do-not-fail-on-risky

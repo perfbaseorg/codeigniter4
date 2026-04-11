@@ -41,7 +41,7 @@ Not supported in v1:
 - PHP `>=8.2 <8.5`
 - CodeIgniter `^4.3.8`
 - Perfbase PHP extension
-- `perfbase/php-sdk` `1.0.0`
+- `perfbase/php-sdk` `^1.0`
 
 Optional:
 
@@ -57,7 +57,7 @@ Install the package:
 composer require perfbase/codeigniter4
 ```
 
-For monorepo development, this package is already configured to use the local sibling SDK checkout via the path repository in `composer.json`.
+This package resolves `perfbase/php-sdk` from Packagist by default. If you need to test against an unpublished SDK branch in a monorepo, add a temporary Composer repository override locally instead of assuming a built-in path repository.
 
 ## Quick Start
 
@@ -188,9 +188,16 @@ The doctor checks:
 
 If worker mode is detected, the doctor also prints a reminder to restart workers after config or deployment changes.
 
-## Compatibility Testing
+## Verification and Compatibility Testing
 
-Normal package CI stays on the declared support floor. Older CodeIgniter 4 minors should be tested explicitly.
+Required PR CI stays intentionally small:
+
+- PHP `8.2` / CodeIgniter `4.3.8`
+- PHP `8.4` / CodeIgniter `4.7.2`
+
+Manual compatibility probes cover the wider declared CodeIgniter 4 range and are used when validating the support floor or widening support claims.
+
+If you run local `composer install` on PHP `8.4`, Composer may resolve a newer compatible CodeIgniter release than the declared floor. Use `bin/test-compat` or the manual compatibility workflow when you need to verify the floor explicitly.
 
 ### Local Docker Compatibility Probes
 
@@ -204,7 +211,7 @@ bin/test-compat --php 8.2 --framework 4.6.5
 
 Notes:
 
-- The script mounts the parent `projects/` directory so the local sibling `lib-php-sdk` path repository continues to work inside the container.
+- The script uses Packagist dependency resolution, matching the published package behavior.
 - `--ignore-php-platform` is intended for floor exploration when the package's current declared PHP floor is higher than the probe target.
 - The script runs `composer update`, `composer run phpstan`, and `composer run test` inside the selected container image.
 

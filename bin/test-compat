@@ -7,7 +7,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 WORKSPACE_ROOT="$(cd "${REPO_ROOT}/.." && pwd)"
 
 PHP_VERSION="${PHP_VERSION:-8.2}"
-FRAMEWORK_VERSION="${FRAMEWORK_VERSION:-4.6.5}"
+FRAMEWORK_VERSION="${FRAMEWORK_VERSION:-4.3.8}"
 RUN_PHPSTAN=1
 RUN_TESTS=1
 REBUILD_IMAGE=1
@@ -19,7 +19,7 @@ Usage: bin/test-compat [options]
 
 Options:
   --php <version>              PHP version for the container image. Default: 8.2
-  --framework <version>        CodeIgniter framework version to install. Default: 4.6.5
+  --framework <version>        CodeIgniter framework version to install. Default: 4.3.8
   --skip-phpstan               Skip PHPStan.
   --skip-tests                 Skip PHPUnit.
   --ignore-php-platform        Run Composer with --ignore-platform-req=php.
@@ -74,12 +74,21 @@ IMAGE_TAG="perfbase-codeigniter4-compat:php-${PHP_VERSION//./-}"
 CONFIGURE_COMMAND="composer config audit.block-insecure false"
 REQUIRE_COMMAND="composer require --no-interaction --no-progress --no-update codeigniter4/framework:${FRAMEWORK_VERSION}"
 UPDATE_COMMAND="composer update --with-all-dependencies --prefer-dist --no-progress --no-interaction"
+TMP_WORKDIR="/tmp/lib-codeigniter4-compat-${PHP_VERSION//./-}-${FRAMEWORK_VERSION//./-}-$RANDOM"
 
 if [[ "${IGNORE_PHP_PLATFORM}" -eq 1 ]]; then
     UPDATE_COMMAND="${UPDATE_COMMAND} --ignore-platform-req=php"
 fi
 
-COMMANDS=("${CONFIGURE_COMMAND}" "${REQUIRE_COMMAND}" "${UPDATE_COMMAND} codeigniter4/framework")
+COMMANDS=(
+    "rm -rf ${TMP_WORKDIR}"
+    "cp -R /workspace/lib-codeigniter4 ${TMP_WORKDIR}"
+    "cd ${TMP_WORKDIR}"
+    "rm -rf vendor composer.lock .phpunit.cache"
+    "${CONFIGURE_COMMAND}"
+    "${REQUIRE_COMMAND}"
+    "${UPDATE_COMMAND}"
+)
 
 if [[ "${RUN_PHPSTAN}" -eq 1 ]]; then
     COMMANDS+=("composer run phpstan")

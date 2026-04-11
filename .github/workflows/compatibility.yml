@@ -38,15 +38,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Checkout local Perfbase PHP SDK
-        uses: actions/checkout@v4
-        with:
-          repository: perfbaseorg/php-sdk
-          path: lib-php-sdk-src
-
-      - name: Link sibling SDK checkout
-        run: ln -s "$GITHUB_WORKSPACE/lib-php-sdk-src" "$GITHUB_WORKSPACE/../lib-php-sdk"
-
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
