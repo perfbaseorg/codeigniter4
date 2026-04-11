@@ -65,7 +65,7 @@ class RecordingPerfbaseClient extends Perfbase
         $this->attributes[$key] = $value;
     }
 
-    public function reset()
+    public function reset(): void
     {
     }
 }
