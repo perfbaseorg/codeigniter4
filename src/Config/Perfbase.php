@@ -21,6 +21,9 @@ class Perfbase extends BaseConfig
     public string $appVersion = '';
     public ?string $userResolver = null;
 
+    /** @var array<int, int>|string */
+    public array|string $profileHttpStatusCodes = '';
+
     /** @var array<int, string> */
     public array $includeHttp = ['*'];
 
@@ -48,6 +51,10 @@ class Perfbase extends BaseConfig
         $this->flags = $this->normalizeInt(env('perfbase.flags'), $this->flags);
         $this->appVersion = $this->normalizeString(env('perfbase.appVersion'), $this->appVersion);
         $this->userResolver = $this->normalizeEnvNullableString('perfbase.userResolver', $this->userResolver);
+        $this->profileHttpStatusCodes = $this->normalizeIntList(
+            env('perfbase.profileHttpStatusCodes'),
+            is_array($this->profileHttpStatusCodes) ? $this->profileHttpStatusCodes : $this->defaultProfileHttpStatusCodes()
+        );
         $this->includeHttp = $this->normalizeStringList(env('perfbase.includeHttp'), $this->includeHttp);
         $this->excludeHttp = $this->normalizeStringList(env('perfbase.excludeHttp'), $this->excludeHttp);
         $this->includeConsole = $this->normalizeStringList(env('perfbase.includeConsole'), $this->includeConsole);
@@ -94,6 +101,52 @@ class Perfbase extends BaseConfig
         return $normalized;
     }
 
+    /**
+     * @param mixed $value
+     * @param array<int, int> $default
+     * @return array<int, int>
+     */
+    private function normalizeIntList(mixed $value, array $default = []): array
+    {
+        if (is_string($value)) {
+            $parts = preg_split('/\r\n|\r|\n|,/', $value);
+            if (!is_array($parts)) {
+                return $default;
+            }
+
+            $value = $parts;
+        }
+
+        if ($value === null) {
+            return $default;
+        }
+
+        if (!is_array($value)) {
+            return $default;
+        }
+
+        $normalized = [];
+        foreach ($value as $item) {
+            if (is_int($item)) {
+                $normalized[] = $item;
+                continue;
+            }
+
+            if (!is_string($item)) {
+                continue;
+            }
+
+            $item = trim($item);
+            if ($item === '' || !ctype_digit($item)) {
+                continue;
+            }
+
+            $normalized[] = (int) $item;
+        }
+
+        return array_values(array_unique($normalized));
+    }
+
     private function normalizeBool(mixed $value, bool $default): bool
     {
         if ($value === null) {
@@ -116,6 +169,14 @@ class Perfbase extends BaseConfig
         }
 
         return (bool) $value;
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function defaultProfileHttpStatusCodes(): array
+    {
+        return [...range(200, 299), ...range(500, 599)];
     }
 
     private function normalizeInt(mixed $value, int $default): int

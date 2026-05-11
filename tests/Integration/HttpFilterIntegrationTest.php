@@ -46,7 +46,7 @@ final class HttpFilterIntegrationTest extends CodeIgniterTestCase
         ])->call('GET', 'articles/42?secret=1');
 
         $response->assertOK();
-        self::assertSame(['http.GET./articles/([0-9]+)'], $this->client->startedSpans);
+        self::assertSame(['http'], $this->client->startedSpans);
         self::assertStringEndsWith('/articles/42', $this->client->attributes['http_url']);
         self::assertStringNotContainsString('secret=1', $this->client->attributes['http_url']);
         self::assertSame(1, $this->client->submitCalls);
@@ -68,6 +68,41 @@ final class HttpFilterIntegrationTest extends CodeIgniterTestCase
         self::assertSame(0, $this->countTrackedHttpLifecycles());
     }
 
+    public function testHttpFilterDropsDisallowedStatusCodeByDefault(): void
+    {
+        $response = $this->withRoutes([
+            ['GET', 'missing', static function () {
+                return service('response')->setStatusCode(404)->setBody('missing');
+            }],
+        ])->call('GET', 'missing');
+
+        $response->assertStatus(404);
+        self::assertSame(['http'], $this->client->startedSpans);
+        self::assertSame('404', $this->client->attributes['http_status_code']);
+        self::assertSame(0, $this->client->submitCalls);
+        self::assertSame(1, $this->client->resetCalls);
+        self::assertSame(0, $this->countTrackedHttpLifecycles());
+    }
+
+    public function testHttpFilterSubmitsCustomAllowedStatusCode(): void
+    {
+        $config = config('Perfbase');
+        $config->profileHttpStatusCodes = [200, 404];
+
+        $response = $this->withRoutes([
+            ['GET', 'missing', static function () {
+                return service('response')->setStatusCode(404)->setBody('missing');
+            }],
+        ])->call('GET', 'missing');
+
+        $response->assertStatus(404);
+        self::assertSame(['http'], $this->client->startedSpans);
+        self::assertSame('404', $this->client->attributes['http_status_code']);
+        self::assertSame(1, $this->client->submitCalls);
+        self::assertSame(0, $this->client->resetCalls);
+        self::assertSame(0, $this->countTrackedHttpLifecycles());
+    }
+
     public function testSequentialRequestsDoNotLeakLifecycleState(): void
     {
         $routes = [
@@ -80,7 +115,7 @@ final class HttpFilterIntegrationTest extends CodeIgniterTestCase
         $this->withRoutes($routes)->call('GET', 'articles/43')->assertOK();
 
         self::assertSame(
-            ['http.GET./articles/([0-9]+)', 'http.GET./articles/([0-9]+)'],
+            ['http', 'http'],
             $this->client->startedSpans
         );
         self::assertSame(2, $this->client->submitCalls);

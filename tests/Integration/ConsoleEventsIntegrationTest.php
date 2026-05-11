@@ -50,7 +50,7 @@ final class ConsoleEventsIntegrationTest extends CodeIgniterTestCase
         $exit = $commands->run('test:ok', []);
 
         self::assertSame(17, $exit);
-        self::assertSame(['console.test:ok'], $this->client->startedSpans);
+        self::assertSame(['cli'], $this->client->startedSpans);
         self::assertSame('17', $this->client->attributes['exit_code']);
         self::assertSame(1, $this->client->submitCalls);
         self::assertNull($this->registry->getActiveConsoleLifecycle());
@@ -75,7 +75,7 @@ final class ConsoleEventsIntegrationTest extends CodeIgniterTestCase
         try {
             $commands->run('test:fail', []);
         } finally {
-            self::assertSame(['console.test:fail'], $this->client->startedSpans);
+            self::assertSame(['cli'], $this->client->startedSpans);
             self::assertSame('1', $this->client->attributes['exit_code']);
             self::assertSame('cli boom', $this->client->attributes['exception']);
             self::assertSame(1, $this->client->submitCalls);
@@ -102,7 +102,7 @@ final class ConsoleEventsIntegrationTest extends CodeIgniterTestCase
 
         self::assertSame(17, $commands->run('test:ok', []));
 
-        self::assertSame(['console.test:ok', 'console.test:ok'], $this->client->startedSpans);
+        self::assertSame(['cli', 'cli'], $this->client->startedSpans);
         self::assertSame(2, $this->client->submitCalls);
         self::assertNull($this->registry->getActiveConsoleLifecycle());
     }

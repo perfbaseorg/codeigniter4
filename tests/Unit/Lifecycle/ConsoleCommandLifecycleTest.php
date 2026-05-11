@@ -28,7 +28,8 @@ final class ConsoleCommandLifecycleTest extends TestCase
         $lifecycle->setException(new \RuntimeException('cli boom'));
         $lifecycle->stopProfiling();
 
-        self::assertSame(['console.test:ok'], $client->startedSpans);
+        self::assertSame(['cli'], $client->startedSpans);
+        self::assertSame('test:ok', $client->attributes['action']);
         self::assertSame('console', $client->attributes['source']);
         self::assertSame('17', $client->attributes['exit_code']);
         self::assertSame('cli boom', $client->attributes['exception']);

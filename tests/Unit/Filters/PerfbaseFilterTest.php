@@ -67,7 +67,7 @@ final class PerfbaseFilterTest extends CodeIgniterTestCase
         self::assertNotNull($this->registry->getHttpLifecycle($request));
         self::assertSame($response, $filter->after($request, $response));
         self::assertNull($this->registry->getHttpLifecycle($request));
-        self::assertSame(['http.GET./articles/([0-9]+)'], $this->client->startedSpans);
+        self::assertSame(['http'], $this->client->startedSpans);
         self::assertSame('202', $this->client->attributes['http_status_code']);
         self::assertSame(1, $this->client->submitCalls);
     }
@@ -81,6 +81,76 @@ final class PerfbaseFilterTest extends CodeIgniterTestCase
         $filter = new PerfbaseFilter();
 
         self::assertSame($response, $filter->after($request, $response));
+    }
+
+    public function testAfterDropsDisallowedStatusCodeByDefault(): void
+    {
+        Services::injectMock('router', new class {
+            public function getMatchedRoute(): array
+            {
+                return ['missing'];
+            }
+
+            public function controllerName(): string
+            {
+                return 'App\\Controllers\\Missing';
+            }
+
+            public function methodName(): string
+            {
+                return 'show';
+            }
+        });
+
+        $request = $this->makeRequest('http://localhost/missing');
+        $request->setMethod('GET');
+
+        $response = $this->createMock(ResponseInterface::class);
+        $response->method('getStatusCode')->willReturn(404);
+
+        $filter = new PerfbaseFilter();
+
+        self::assertNull($filter->before($request));
+        self::assertSame($response, $filter->after($request, $response));
+        self::assertSame('404', $this->client->attributes['http_status_code']);
+        self::assertSame(0, $this->client->submitCalls);
+        self::assertSame(1, $this->client->resetCalls);
+    }
+
+    public function testAfterSubmitsCustomAllowedStatusCode(): void
+    {
+        Services::injectMock('router', new class {
+            public function getMatchedRoute(): array
+            {
+                return ['missing'];
+            }
+
+            public function controllerName(): string
+            {
+                return 'App\\Controllers\\Missing';
+            }
+
+            public function methodName(): string
+            {
+                return 'show';
+            }
+        });
+
+        $config = config('Perfbase');
+        $config->profileHttpStatusCodes = [200, 404];
+
+        $request = $this->makeRequest('http://localhost/missing');
+        $request->setMethod('GET');
+
+        $response = $this->createMock(ResponseInterface::class);
+        $response->method('getStatusCode')->willReturn(404);
+
+        $filter = new PerfbaseFilter();
+
+        self::assertNull($filter->before($request));
+        self::assertSame($response, $filter->after($request, $response));
+        self::assertSame(1, $this->client->submitCalls);
+        self::assertSame(0, $this->client->resetCalls);
     }
 
     private function makeRequest(string $uri): IncomingRequest

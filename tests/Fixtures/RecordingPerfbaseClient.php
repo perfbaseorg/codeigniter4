@@ -21,6 +21,7 @@ class RecordingPerfbaseClient extends Perfbase
     public bool $extensionAvailable = true;
     public bool $stopResult = true;
     public int $submitCalls = 0;
+    public int $resetCalls = 0;
     public ?\Throwable $submitException = null;
     public ?SubmitResult $submitResult = null;
 
@@ -67,5 +68,6 @@ class RecordingPerfbaseClient extends Perfbase
 
     public function reset(): void
     {
+        $this->resetCalls++;
     }
 }

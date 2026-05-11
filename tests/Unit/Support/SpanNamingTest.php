@@ -12,17 +12,17 @@ final class SpanNamingTest extends TestCase
     public function testForHttpPrefersRoutePatternThenControllerThenPath(): void
     {
         self::assertSame(
-            'http.GET./articles/(:num)',
+            'http',
             SpanNaming::forHttp('GET', 'articles/(:num)', 'App\\Controllers\\Articles', 'show', '/articles/42')
         );
 
         self::assertSame(
-            'http.GET.App\\Controllers\\Articles::show',
+            'http',
             SpanNaming::forHttp('GET', null, 'App\\Controllers\\Articles', 'show', '/articles/42')
         );
 
         self::assertSame(
-            'http.GET./articles/42',
+            'http',
             SpanNaming::forHttp('GET', null, null, null, 'articles/42')
         );
     }
@@ -31,7 +31,7 @@ final class SpanNamingTest extends TestCase
     {
         $_SERVER['argv'] = ['php', 'spark', 'cache:clear'];
 
-        self::assertSame('console.cache:clear', SpanNaming::forConsole('cache:clear'));
+        self::assertSame('cli', SpanNaming::forConsole('cache:clear'));
         self::assertSame('cache:clear', SpanNaming::detectConsoleCommand([]));
         self::assertSame('queue:work', SpanNaming::detectConsoleCommand(['queue:work']));
         self::assertSame(17, SpanNaming::detectExitCode(['queue:work', 17]));
@@ -39,6 +39,14 @@ final class SpanNamingTest extends TestCase
         $throwable = new \RuntimeException('boom');
         self::assertSame($throwable, SpanNaming::detectThrowable([$throwable]));
         self::assertNull(SpanNaming::detectThrowable([]));
+    }
+
+    public function testGeneratedSpanNamesAreSdkSafe(): void
+    {
+        $span = SpanNaming::forHttp('DELETE', '/accounts/{account}/settings', null, null, '/accounts/42/settings');
+
+        self::assertMatchesRegularExpression('/^[A-Za-z]+$/', $span);
+        self::assertLessThanOrEqual(64, strlen($span));
     }
 
     public function testDetectConsoleCommandSupportsObjectsAndUnknownFallback(): void

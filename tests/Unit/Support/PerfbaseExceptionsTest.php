@@ -62,6 +62,46 @@ final class PerfbaseExceptionsTest extends CodeIgniterTestCase
         self::assertSame('uncaught boom', $client->attributes['exception']);
         self::assertSame('500', $client->attributes['http_status_code']);
         self::assertSame(1, $client->submitCalls);
+        self::assertSame(0, $client->resetCalls);
+        self::assertNull($registry->getHttpLifecycle($request));
+    }
+
+    public function testExceptionHandlerDropsDisallowedErrorStatusWhenConfigured(): void
+    {
+        $client = new RecordingPerfbaseClient();
+        $request = new IncomingRequest(config('App'), new URI('https://example.com/articles/42'), null, new UserAgent());
+        $request->setMethod('GET');
+
+        $registry = new ActiveLifecycleRegistry();
+        Services::injectMock('request', $request);
+        Services::injectMock('perfbaseLifecycleRegistry', $registry);
+        Services::injectMock('perfbaseErrorHandler', new ErrorHandler(false, false));
+
+        $config = new Perfbase();
+        $config->enabled = true;
+        $config->apiKey = 'test-key';
+        $config->sampleRate = 1.0;
+        $config->profileHttpStatusCodes = [200, 404];
+
+        $lifecycle = new HttpRequestLifecycle(
+            $request,
+            new TestPerfbaseClientProvider($client),
+            new ErrorHandler(false, false),
+            $config,
+            'articles/(:num)'
+        );
+
+        $lifecycle->startProfiling();
+        $registry->setHttpLifecycle($request, $lifecycle);
+
+        $exceptions = new TestPerfbaseExceptions(config('Exceptions'));
+        $throwable = new \RuntimeException('uncaught boom');
+        $exceptions->exceptionHandler($throwable);
+
+        self::assertSame($throwable, $exceptions->delegatedException);
+        self::assertSame('500', $client->attributes['http_status_code']);
+        self::assertSame(0, $client->submitCalls);
+        self::assertSame(1, $client->resetCalls);
         self::assertNull($registry->getHttpLifecycle($request));
     }
 

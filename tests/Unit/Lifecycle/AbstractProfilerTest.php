@@ -24,7 +24,7 @@ final class AbstractProfilerTest extends TestCase
         $profiler->startProfiling();
         $profiler->stopProfiling();
 
-        self::assertSame(['test.span'], $client->startedSpans);
+        self::assertSame(['test'], $client->startedSpans);
         self::assertSame(1, $client->submitCalls);
         self::assertSame('testing', $client->attributes['environment']);
     }
@@ -80,6 +80,24 @@ final class AbstractProfilerTest extends TestCase
         $profiler->stopProfiling();
 
         self::assertSame(0, $client->submitCalls);
+        self::assertFalse($profiler->hasStarted());
+    }
+
+    public function testStopProfilingResetsWithoutSubmittingWhenTraceShouldBeDropped(): void
+    {
+        $client = new RecordingPerfbaseClient();
+        $profiler = new class(new TestPerfbaseClientProvider($client), new ErrorHandler(false, false), $this->config()) extends TestProfiler {
+            protected function shouldSubmitTrace(): bool
+            {
+                return false;
+            }
+        };
+
+        $profiler->startProfiling();
+        $profiler->stopProfiling();
+
+        self::assertSame(0, $client->submitCalls);
+        self::assertSame(1, $client->resetCalls);
         self::assertFalse($profiler->hasStarted());
     }
 

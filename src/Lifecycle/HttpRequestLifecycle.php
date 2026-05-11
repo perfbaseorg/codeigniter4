@@ -24,6 +24,7 @@ class HttpRequestLifecycle extends AbstractProfiler
     private ?string $controller;
     private ?string $method;
     private string $httpMethod;
+    private ?int $responseStatusCode = null;
 
     public function __construct(
         RequestInterface $request,
@@ -50,6 +51,7 @@ class HttpRequestLifecycle extends AbstractProfiler
 
     public function setResponseStatusCode(int $statusCode): void
     {
+        $this->responseStatusCode = $statusCode;
         $this->setAttribute('http_status_code', (string) $statusCode);
     }
 
@@ -93,6 +95,19 @@ class HttpRequestLifecycle extends AbstractProfiler
         if ($userId !== null && $userId !== '') {
             $this->setAttribute('user_id', $userId);
         }
+    }
+
+    protected function shouldSubmitTrace(): bool
+    {
+        if ($this->responseStatusCode === null) {
+            return true;
+        }
+
+        $allowedStatusCodes = is_array($this->config->profileHttpStatusCodes)
+            ? $this->config->profileHttpStatusCodes
+            : [];
+
+        return in_array($this->responseStatusCode, $allowedStatusCodes, true);
     }
 
     /**

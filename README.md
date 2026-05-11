@@ -116,6 +116,7 @@ public ?string $proxy = null;
 public int $flags = FeatureFlags::DefaultFlags;
 public string $appVersion = '';
 public ?string $userResolver = null;
+public array|string $profileHttpStatusCodes = ''; // normalized to [...range(200, 299), ...range(500, 599)]
 public array $includeHttp = ['*'];
 public array $excludeHttp = [];
 public array $includeConsole = ['*'];
@@ -136,11 +137,14 @@ perfbase.proxy=
 perfbase.flags=0
 perfbase.appVersion=
 perfbase.userResolver=
+perfbase.profileHttpStatusCodes=200,201,...,299,500,501,...,599
 perfbase.includeHttp=*
 perfbase.excludeHttp=
 perfbase.includeConsole=*
 perfbase.excludeConsole=
 ```
+
+`profileHttpStatusCodes` is a comma-separated allowlist. The default behavior is equivalent to `[...range(200, 299), ...range(500, 599)]`, so 404 responses are dropped by default while 5xx responses are kept.
 
 ### Example Production Configuration
 
@@ -162,6 +166,7 @@ final class Perfbase extends BasePerfbase
     public int $timeout = 10;
     public int $flags = FeatureFlags::DefaultFlags;
     public string $appVersion = '1.0.0';
+    public array $profileHttpStatusCodes = [200, 201, 202, 204];
     public array $excludeHttp = ['/health', '/up'];
     public array $excludeConsole = ['cache:*', 'migrate:*'];
 }
@@ -236,6 +241,7 @@ The package:
 - starts profiling in the filter `before()` phase
 - finalizes successful requests in `after()`
 - finalizes uncaught exception paths through the Perfbase exception service
+- only submits HTTP traces whose response status is in `profileHttpStatusCodes` (default: `2xx` and `5xx`)
 - excludes query strings from `http_url`
 - prefers route patterns for low-cardinality action naming
 - falls back to `Controller::method` and then the sanitized path

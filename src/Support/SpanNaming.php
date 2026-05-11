@@ -13,24 +13,12 @@ class SpanNaming
         ?string $controllerMethod,
         string $path
     ): string {
-        $identifier = $routePattern;
-
-        if ($identifier === null || $identifier === '') {
-            if ($controller !== null && $controller !== '' && $controllerMethod !== null && $controllerMethod !== '') {
-                $identifier = sprintf('%s::%s', $controller, $controllerMethod);
-            } else {
-                $identifier = self::ensureLeadingSlash($path);
-            }
-        } elseif ($identifier[0] !== '/') {
-            $identifier = self::ensureLeadingSlash($identifier);
-        }
-
-        return sprintf('http.%s.%s', strtoupper($method), $identifier);
+        return 'http';
     }
 
     public static function forConsole(string $command): string
     {
-        return sprintf('console.%s', $command);
+        return 'cli';
     }
 
     /**
@@ -105,8 +93,4 @@ class SpanNaming
         return null;
     }
 
-    private static function ensureLeadingSlash(string $value): string
-    {
-        return '/' . ltrim($value, '/');
-    }
 }

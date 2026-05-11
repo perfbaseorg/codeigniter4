@@ -48,7 +48,7 @@ final class HttpRequestLifecycleTest extends CodeIgniterTestCase
         $lifecycle->setResponseStatusCode(201);
         $lifecycle->stopProfiling();
 
-        self::assertSame(['http.GET./articles/(:num)'], $client->startedSpans);
+        self::assertSame(['http'], $client->startedSpans);
         self::assertSame('GET articles/(:num)', $client->attributes['action']);
         self::assertStringEndsWith('/articles/42', $client->attributes['http_url']);
         self::assertStringNotContainsString('secret=1', $client->attributes['http_url']);
@@ -73,6 +73,53 @@ final class HttpRequestLifecycleTest extends CodeIgniterTestCase
         $lifecycle = new HttpRequestLifecycle($request, new TestPerfbaseClientProvider($client), new ErrorHandler(false, false), $config);
         $lifecycle->startProfiling();
         self::assertSame([], $client->startedSpans);
+    }
+
+    public function testDisallowedStatusCodeIsDroppedByDefault(): void
+    {
+        $client = new RecordingPerfbaseClient();
+        $request = $this->makeRequest('https://example.com/missing');
+        $request->setMethod('GET');
+
+        $lifecycle = new HttpRequestLifecycle(
+            $request,
+            new TestPerfbaseClientProvider($client),
+            new ErrorHandler(false, false),
+            $this->config()
+        );
+
+        $lifecycle->startProfiling();
+        $lifecycle->setResponseStatusCode(404);
+        $lifecycle->stopProfiling();
+
+        self::assertSame(0, $client->submitCalls);
+        self::assertSame(1, $client->resetCalls);
+        self::assertSame('404', $client->attributes['http_status_code']);
+    }
+
+    public function testCustomAllowedStatusCodeIsSubmitted(): void
+    {
+        $client = new RecordingPerfbaseClient();
+        $request = $this->makeRequest('https://example.com/missing');
+        $request->setMethod('GET');
+
+        $config = $this->config();
+        $config->profileHttpStatusCodes = [200, 404];
+
+        $lifecycle = new HttpRequestLifecycle(
+            $request,
+            new TestPerfbaseClientProvider($client),
+            new ErrorHandler(false, false),
+            $config
+        );
+
+        $lifecycle->startProfiling();
+        $lifecycle->setResponseStatusCode(404);
+        $lifecycle->stopProfiling();
+
+        self::assertSame(1, $client->submitCalls);
+        self::assertSame(0, $client->resetCalls);
+        self::assertSame('404', $client->attributes['http_status_code']);
     }
 
     public function testExceptionIsCaptured(): void
@@ -119,7 +166,7 @@ final class HttpRequestLifecycleTest extends CodeIgniterTestCase
         $lifecycle->startProfiling();
         $lifecycle->stopProfiling();
 
-        self::assertSame(['http.POST.App\\Controllers\\Articles::store'], $client->startedSpans);
+        self::assertSame(['http'], $client->startedSpans);
         self::assertSame('POST App\\Controllers\\Articles::store', $client->attributes['action']);
         self::assertSame('123', $client->attributes['user_id']);
     }
