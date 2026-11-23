@@ -10,6 +10,11 @@ Events::on('perfbase_pre_command', static function (...$args): void {
     $errorHandler = service('perfbaseErrorHandler');
     $config = config('Perfbase');
 
+    // Only the outermost command is profiled; nested commands run inside its trace.
+    if ($registry->enterConsoleCommand() > 1) {
+        return;
+    }
+
     try {
         $commandName = Perfbase\CodeIgniter4\Support\SpanNaming::detectConsoleCommand($args);
         $lifecycle = new Perfbase\CodeIgniter4\Lifecycle\ConsoleCommandLifecycle(
@@ -30,6 +35,10 @@ Events::on('perfbase_pre_command', static function (...$args): void {
 Events::on('perfbase_post_command', static function (...$args): void {
     $registry = service('perfbaseLifecycleRegistry');
     $errorHandler = service('perfbaseErrorHandler');
+
+    if ($registry->leaveConsoleCommand() > 0) {
+        return;
+    }
 
     try {
         $lifecycle = $registry->getActiveConsoleLifecycle();

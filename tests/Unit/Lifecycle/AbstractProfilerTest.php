@@ -9,6 +9,8 @@ use Perfbase\CodeIgniter4\Support\ErrorHandler;
 use Perfbase\CodeIgniter4\Tests\Fixtures\RecordingPerfbaseClient;
 use Perfbase\CodeIgniter4\Tests\Fixtures\TestPerfbaseClientProvider;
 use Perfbase\CodeIgniter4\Tests\Fixtures\TestProfiler;
+use Perfbase\CodeIgniter4\Runtime\PerfbaseClientProvider;
+use Perfbase\SDK\Exception\PerfbaseException;
 use Perfbase\SDK\SubmitResult;
 use PHPUnit\Framework\TestCase;
 
@@ -56,6 +58,49 @@ final class AbstractProfilerTest extends TestCase
         $profiler->stopProfiling();
 
         self::assertSame(1, $client->submitCalls);
+    }
+
+    public function testSubmitExceptionIsSwallowedInProductionMode(): void
+    {
+        $client = new RecordingPerfbaseClient();
+        $client->submitException = new PerfbaseException('Extension returned empty trace data');
+        $profiler = new TestProfiler(new TestPerfbaseClientProvider($client), new ErrorHandler(false, false), $this->config());
+
+        $profiler->startProfiling();
+        $profiler->stopProfiling();
+
+        self::assertSame(1, $client->submitCalls);
+        self::assertFalse($profiler->hasStarted());
+    }
+
+    public function testDisabledProfilerDoesNotBuildTheSdkClient(): void
+    {
+        $config = $this->config();
+        $config->enabled = false;
+        $config->apiKey = '';
+
+        $factoryCalls = 0;
+        $provider = new PerfbaseClientProvider(
+            $config,
+            new ErrorHandler(true, true),
+            static function () use (&$factoryCalls): RecordingPerfbaseClient {
+                $factoryCalls++;
+
+                return new RecordingPerfbaseClient();
+            }
+        );
+        $profiler = new class($provider, new ErrorHandler(true, true), $config) extends TestProfiler {
+            protected function shouldProfile(): bool
+            {
+                return $this->config->enabled;
+            }
+        };
+
+        // Debug mode rethrows: building the SDK config without an API key would throw here.
+        $profiler->startProfiling();
+
+        self::assertFalse($profiler->hasStarted());
+        self::assertSame(0, $factoryCalls);
     }
 
     public function testDebugModeRethrowsSubmitExceptions(): void

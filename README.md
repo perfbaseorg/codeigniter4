@@ -24,7 +24,7 @@ This package is a thin adapter over [`perfbase/php-sdk`](https://packagist.org/p
 Supported in v1:
 
 - HTTP request profiling through a global CodeIgniter filter
-- Spark CLI profiling through `pre_command` and `post_command` events
+- Spark CLI profiling through the decorated `Commands` service
 - optional authenticated user enrichment through a custom resolver or CodeIgniter Shield
 - uncaught HTTP exception cleanup through a Perfbase-aware exception service
 - worker-safe lifecycle cleanup for FrankenPHP worker mode
@@ -38,10 +38,10 @@ Not supported in v1:
 
 ## Requirements
 
-- PHP `>=8.2 <8.5`
-- CodeIgniter `^4.3.8`
+- PHP `>=8.2 <8.7`
+- CodeIgniter `^4.3.8` (verified up to `4.7`)
 - Perfbase PHP extension
-- `perfbase/php-sdk` `^1.0`
+- `perfbase/php-sdk` `^1.9`
 
 Optional:
 
@@ -120,7 +120,7 @@ public array|string $profileHttpStatusCodes = ''; // normalized to [...range(200
 public array $includeHttp = ['*'];
 public array $excludeHttp = [];
 public array $includeConsole = ['*'];
-public array $excludeConsole = [];
+public array $excludeConsole = ['serve', 'queue:work'];
 ```
 
 ### Environment Variables
@@ -134,7 +134,7 @@ perfbase.apiUrl=https://ingress.perfbase.cloud
 perfbase.sampleRate=0.1
 perfbase.timeout=10
 perfbase.proxy=
-perfbase.flags=0
+perfbase.flags=
 perfbase.appVersion=
 perfbase.userResolver=
 perfbase.profileHttpStatusCodes=200,201,...,299,500,501,...,599
@@ -143,6 +143,10 @@ perfbase.excludeHttp=
 perfbase.includeConsole=*
 perfbase.excludeConsole=
 ```
+
+A blank value (for example `perfbase.flags=`) means "not set" and keeps the default from the config class. Numeric values such as `perfbase.timeout=12` are cast to the types the SDK requires.
+
+`perfbase.flags` is the SDK `FeatureFlags` bitmask. Leave it blank for `FeatureFlags::DefaultFlags` (every feature except `TrackCpuTime` and `TrackMemoryAllocation`). `0` enables every feature except the opt-in flags `UsePreciseClock` and `TrackCpuTime`; a mask containing only opt-in flags adds them to that set, and any mask containing a regular flag is used exactly. See the SDK `FeatureFlags` class for the list (`TrackPdo`, `TrackHttp`, `TrackCaches`, `TrackExceptions`, and so on).
 
 `profileHttpStatusCodes` is a comma-separated allowlist. The default behavior is equivalent to `[...range(200, 299), ...range(500, 599)]`, so 404 responses are dropped by default while 5xx responses are kept.
 
@@ -168,7 +172,8 @@ final class Perfbase extends BasePerfbase
     public string $appVersion = '1.0.0';
     public array $profileHttpStatusCodes = [200, 201, 202, 204];
     public array $excludeHttp = ['/health', '/up'];
-    public array $excludeConsole = ['cache:*', 'migrate:*'];
+    // Keep the long-running defaults when overriding the console exclusions.
+    public array $excludeConsole = ['serve', 'queue:work', 'cache:*', 'migrate:*'];
 }
 ```
 
@@ -198,7 +203,7 @@ If worker mode is detected, the doctor also prints a reminder to restart workers
 Required PR CI stays intentionally small:
 
 - PHP `8.2` / CodeIgniter `4.3.8`
-- PHP `8.4` / CodeIgniter `4.7.2`
+- PHP `8.4`, `8.5` and `8.6` / CodeIgniter `4.7`
 
 Manual compatibility probes cover the wider declared CodeIgniter 4 range and are used when validating the support floor or widening support claims.
 
@@ -228,7 +233,7 @@ The manual workflow in `.github/workflows/compatibility.yml` runs a small set of
 - PHP `8.2` / CodeIgniter `4.4.8`
 - PHP `8.2` / CodeIgniter `4.5.8`
 - PHP `8.2` / CodeIgniter `4.6.5`
-- PHP `8.4` / CodeIgniter `4.7.2`
+- PHP `8.4`, `8.5` and `8.6` / CodeIgniter `4.7.6`
 
 This workflow is manual on purpose. It is for compatibility investigation and release-floor validation, not for every pull request.
 
@@ -242,7 +247,7 @@ The package:
 - finalizes successful requests in `after()`
 - finalizes uncaught exception paths through the Perfbase exception service
 - only submits HTTP traces whose response status is in `profileHttpStatusCodes` (default: `2xx` and `5xx`)
-- excludes query strings from `http_url`
+- records the full request URL, including the query string, in `http_url` with credential-looking values redacted
 - prefers route patterns for low-cardinality action naming
 - falls back to `Controller::method` and then the sanitized path
 
@@ -263,11 +268,11 @@ The HTTP lifecycle sets:
 - `app_version`
 - `php_version`
 
-`http_url` intentionally excludes query strings to avoid leaking secrets and to reduce cardinality.
+`http_url` is the full request URL including the query string (`/ajax?method=example` is often what makes a trace useful). It is passed through the SDK `UrlSanitizer`, which replaces the values of credential-looking parameters (`token`, `password`, `api_key`, `signature`, `nonce`, session IDs, `email`, and similar) with `REDACTED` and drops user info and fragments. `action`, which groups traces, never contains the query string.
 
 ## Spark CLI Profiling
 
-CLI profiling is wired through `pre_command` and `post_command` events.
+CLI profiling is wired through the decorated `Commands` service. The package preserves CodeIgniter's native `pre_command` and `post_command` events, then uses `perfbase_pre_command` and `perfbase_post_command` for the profiling lifecycle.
 
 The package:
 
@@ -276,6 +281,8 @@ The package:
 - records exit codes on completion
 - records thrown exceptions on failure
 - always clears active command state after completion
+- profiles only the outermost command: commands started from another command (`$this->call()`, `command()`) are part of the outer trace
+- skips long-running commands by default (`excludeConsole = ['serve', 'queue:work']`). A trace for `spark serve` or a `codeigniter4/queue` worker would only end when the process exits. If you override `excludeConsole`, keep these entries
 
 ## Filter Matching
 
@@ -363,7 +370,8 @@ If Shield is installed and its auth service is available, the package will try t
 The package fails open by default.
 
 - profiling failures must not break the host application in production
-- submission failures are handled internally
+- submission failures, including an exception thrown by the SDK's `submitTrace()`, are handled internally; the application's response and its own exceptions are never replaced by a profiling error
+- the SDK client is only built for contexts that will be profiled, so a disabled install without an API key logs nothing
 - invalid runtime conditions are logged only when configured
 - when `debug=true`, profiling errors are rethrown to make integration problems visible
 

@@ -16,6 +16,7 @@ use Perfbase\CodeIgniter4\Support\SpanNaming;
 use Perfbase\CodeIgniter4\Support\UserIdentifier;
 use Perfbase\CodeIgniter4\Support\UserResolverFactory;
 use Perfbase\SDK\Utils\EnvironmentUtils;
+use Perfbase\SDK\Utils\UrlSanitizer;
 
 class HttpRequestLifecycle extends AbstractProfiler
 {
@@ -148,16 +149,47 @@ class HttpRequestLifecycle extends AbstractProfiler
         return $path === '//' ? '/' : $path;
     }
 
+    /**
+     * Full request URL including the query string. Credential-looking query
+     * values are redacted by the SDK sanitizer; `action` stays query-free.
+     */
     private function buildHttpUrl(string $path): string
     {
-        $scheme = $this->request->getUri()->getScheme();
-        $host = $this->request->getUri()->getHost();
+        $uri = $this->request->getUri();
+        $scheme = $uri->getScheme();
+        $host = $uri->getHost();
 
+        $url = $path;
         if ($scheme !== '' && $host !== '') {
-            return $scheme . '://' . $host . $path;
+            $authority = $host;
+            $port = $uri->getPort();
+            if ($port !== null && !$this->isDefaultPort($scheme, (int) $port)) {
+                $authority .= ':' . $port;
+            }
+
+            $url = $scheme . '://' . $authority . $path;
         }
 
-        return $path;
+        $query = $this->resolveQueryString();
+        if ($query !== '') {
+            $url .= '?' . $query;
+        }
+
+        return UrlSanitizer::sanitize($url);
+    }
+
+    private function isDefaultPort(string $scheme, int $port): bool
+    {
+        $scheme = strtolower($scheme);
+
+        return ($scheme === 'http' && $port === 80) || ($scheme === 'https' && $port === 443);
+    }
+
+    private function resolveQueryString(): string
+    {
+        // The request-bound URI, not $_SERVER['QUERY_STRING'], so the value
+        // always belongs to this request (worker mode, sub-requests, tests).
+        return ltrim($this->request->getUri()->getQuery(), '?');
     }
 
     private function resolveRequestPath(RequestInterface $request): string

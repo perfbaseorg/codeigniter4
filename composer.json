@@ -26,9 +26,9 @@
     }
   ],
   "require": {
-    "php": ">=8.2 <8.5",
+    "php": ">=8.2 <8.7",
     "codeigniter4/framework": "^4.3.8",
-    "perfbase/php-sdk": "^1.0"
+    "perfbase/php-sdk": "^1.9"
   },
   "require-dev": {
     "mockery/mockery": "^1.6",

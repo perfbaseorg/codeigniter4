@@ -58,7 +58,7 @@ class PerfbaseInstallCommand extends BaseCommand
 
             CLI::newLine();
             CLI::write('Next steps:', 'yellow');
-            CLI::write('1. Set PERFBASE_API_KEY in your environment or app/Config/Perfbase.php.');
+            CLI::write('1. Set perfbase.apiKey in your environment or app/Config/Perfbase.php.');
             CLI::write('2. Install the Perfbase PHP extension.');
             CLI::write('3. Run `spark perfbase:doctor` to verify the setup.');
 

@@ -47,10 +47,25 @@ final class HttpFilterIntegrationTest extends CodeIgniterTestCase
 
         $response->assertOK();
         self::assertSame(['http'], $this->client->startedSpans);
-        self::assertStringEndsWith('/articles/42', $this->client->attributes['http_url']);
+        self::assertStringEndsWith('/articles/42?secret=REDACTED', $this->client->attributes['http_url']);
         self::assertStringNotContainsString('secret=1', $this->client->attributes['http_url']);
+        self::assertStringNotContainsString('?', $this->client->attributes['action']);
         self::assertSame(1, $this->client->submitCalls);
         self::assertSame(0, $this->countTrackedHttpLifecycles());
+    }
+
+    public function testHttpUrlKeepsQueryStringAndRedactsCredentials(): void
+    {
+        $response = $this->withRoutes([
+            ['GET', 'ajax', static fn (): string => 'ok'],
+        ])->call('GET', 'ajax?method=example&token=secret');
+
+        $response->assertOK();
+        $httpUrl = $this->client->attributes['http_url'];
+        self::assertStringEndsWith('/ajax?method=example&token=REDACTED', $httpUrl);
+        self::assertStringStartsWith('http', $httpUrl);
+        self::assertStringNotContainsString('secret', $httpUrl);
+        self::assertSame('GET ajax', $this->client->attributes['action']);
     }
 
     public function testHttpFilterHandlesDisabledState(): void
@@ -126,7 +141,6 @@ final class HttpFilterIntegrationTest extends CodeIgniterTestCase
     {
         $reflection = new \ReflectionClass($this->registry);
         $property = $reflection->getProperty('httpLifecycles');
-        $property->setAccessible(true);
 
         return count($property->getValue($this->registry));
     }

@@ -83,7 +83,6 @@ final class ShieldUserResolver implements UserResolverInterface
             }
 
             $property = $reflection->getProperty('mocks');
-            $property->setAccessible(true);
             $mocks = $property->getValue();
 
             return is_array($mocks) && isset($mocks[$serviceName]) && is_object($mocks[$serviceName])

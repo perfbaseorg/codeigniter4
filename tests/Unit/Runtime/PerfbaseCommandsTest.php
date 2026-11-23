@@ -45,7 +45,7 @@ final class PerfbaseCommandsTest extends TestCase
         $result = $commands->run('missing:command', []);
 
         self::assertTrue($commands->verifyCalled);
-        self::assertTrue($result === null);
+        self::assertSame(EXIT_ERROR, $result);
         self::assertFalse($nativePreCalled);
         self::assertFalse($nativePostCalled);
         self::assertFalse($perfbasePreCalled);
@@ -146,7 +146,6 @@ final class PerfbaseCommandsTest extends TestCase
     {
         $reflection = new \ReflectionClass($commands);
         $property = $reflection->getParentClass()->getProperty('commands');
-        $property->setAccessible(true);
         $property->setValue($commands, $map);
     }
 }

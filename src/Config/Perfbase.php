@@ -33,32 +33,76 @@ class Perfbase extends BaseConfig
     /** @var array<int, string> */
     public array $includeConsole = ['*'];
 
-    /** @var array<int, string> */
-    public array $excludeConsole = [];
+    /**
+     * Long-running Spark commands are excluded by default: a trace started for
+     * the worker or server process would only end when the process exits.
+     *
+     * @var array<int, string>
+     */
+    public array $excludeConsole = ['serve', 'queue:work'];
 
     public function __construct()
     {
+        // Snapshot the declared defaults (including any overrides in a published
+        // app/Config/Perfbase.php) before BaseConfig applies env values: it casts
+        // blank values such as `perfbase.timeout=` to 0 / '' in place.
+        $defaults = [
+            'enabled' => $this->enabled,
+            'debug' => $this->debug,
+            'logErrors' => $this->logErrors,
+            'apiKey' => $this->apiKey,
+            'apiUrl' => $this->apiUrl,
+            'sampleRate' => $this->sampleRate,
+            'timeout' => $this->timeout,
+            'proxy' => $this->proxy,
+            'flags' => $this->flags,
+            'appVersion' => $this->appVersion,
+            'userResolver' => $this->userResolver,
+            'profileHttpStatusCodes' => is_array($this->profileHttpStatusCodes)
+                ? $this->profileHttpStatusCodes
+                : $this->defaultProfileHttpStatusCodes(),
+            'includeHttp' => $this->includeHttp,
+            'excludeHttp' => $this->excludeHttp,
+            'includeConsole' => $this->includeConsole,
+            'excludeConsole' => $this->excludeConsole,
+        ];
+
         parent::__construct();
 
-        $this->enabled = $this->normalizeBool(env('perfbase.enabled'), $this->enabled);
-        $this->debug = $this->normalizeBool(env('perfbase.debug'), $this->debug);
-        $this->logErrors = $this->normalizeBool(env('perfbase.logErrors'), $this->logErrors);
-        $this->apiKey = $this->normalizeString(env('perfbase.apiKey'), $this->apiKey);
-        $this->apiUrl = $this->normalizeString(env('perfbase.apiUrl'), $this->apiUrl);
-        $this->sampleRate = $this->normalizeFloat(env('perfbase.sampleRate'), $this->sampleRate);
-        $this->timeout = $this->normalizeInt(env('perfbase.timeout'), $this->timeout);
-        $this->proxy = $this->normalizeEnvNullableString('perfbase.proxy', $this->proxy);
-        $this->flags = $this->normalizeInt(env('perfbase.flags'), $this->flags);
-        $this->appVersion = $this->normalizeString(env('perfbase.appVersion'), $this->appVersion);
-        $this->userResolver = $this->normalizeEnvNullableString('perfbase.userResolver', $this->userResolver);
+        // A blank env value (`perfbase.flags=`) means "not set" and keeps the default.
+        $this->enabled = $this->normalizeBool($this->envValue('perfbase.enabled'), $defaults['enabled']);
+        $this->debug = $this->normalizeBool($this->envValue('perfbase.debug'), $defaults['debug']);
+        $this->logErrors = $this->normalizeBool($this->envValue('perfbase.logErrors'), $defaults['logErrors']);
+        $this->apiKey = $this->normalizeString($this->envValue('perfbase.apiKey'), $defaults['apiKey']);
+        $this->apiUrl = $this->normalizeString($this->envValue('perfbase.apiUrl'), $defaults['apiUrl']);
+        $this->sampleRate = $this->normalizeFloat($this->envValue('perfbase.sampleRate'), $defaults['sampleRate']);
+        $this->timeout = $this->normalizeInt($this->envValue('perfbase.timeout'), $defaults['timeout']);
+        $this->proxy = $this->normalizeEnvNullableString('perfbase.proxy', $defaults['proxy']);
+        $this->flags = $this->normalizeInt($this->envValue('perfbase.flags'), $defaults['flags']);
+        $this->appVersion = $this->normalizeString($this->envValue('perfbase.appVersion'), $defaults['appVersion']);
+        $this->userResolver = $this->normalizeEnvNullableString('perfbase.userResolver', $defaults['userResolver']);
         $this->profileHttpStatusCodes = $this->normalizeIntList(
-            env('perfbase.profileHttpStatusCodes'),
-            is_array($this->profileHttpStatusCodes) ? $this->profileHttpStatusCodes : $this->defaultProfileHttpStatusCodes()
+            $this->envValue('perfbase.profileHttpStatusCodes'),
+            $defaults['profileHttpStatusCodes']
         );
-        $this->includeHttp = $this->normalizeStringList(env('perfbase.includeHttp'), $this->includeHttp);
-        $this->excludeHttp = $this->normalizeStringList(env('perfbase.excludeHttp'), $this->excludeHttp);
-        $this->includeConsole = $this->normalizeStringList(env('perfbase.includeConsole'), $this->includeConsole);
-        $this->excludeConsole = $this->normalizeStringList(env('perfbase.excludeConsole'), $this->excludeConsole);
+        $this->includeHttp = $this->normalizeStringList($this->envValue('perfbase.includeHttp'), $defaults['includeHttp']);
+        $this->excludeHttp = $this->normalizeStringList($this->envValue('perfbase.excludeHttp'), $defaults['excludeHttp']);
+        $this->includeConsole = $this->normalizeStringList($this->envValue('perfbase.includeConsole'), $defaults['includeConsole']);
+        $this->excludeConsole = $this->normalizeStringList($this->envValue('perfbase.excludeConsole'), $defaults['excludeConsole']);
+    }
+
+    /**
+     * Returns the env value, or null when it is unset or blank.
+     */
+    private function envValue(string $key): mixed
+    {
+        $value = env($key);
+
+        if (is_string($value) && trim($value) === '') {
+            return null;
+        }
+
+        return $value;
     }
 
     /**

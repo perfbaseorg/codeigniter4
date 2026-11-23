@@ -31,7 +31,13 @@ jobs:
             framework: '4.6.5'
             ignore_php_platform: false
           - php: '8.4'
-            framework: '4.7.2'
+            framework: '4.7.6'
+            ignore_php_platform: false
+          - php: '8.5'
+            framework: '4.7.6'
+            ignore_php_platform: false
+          - php: '8.6'
+            framework: '4.7.6'
             ignore_php_platform: false
 
     steps:

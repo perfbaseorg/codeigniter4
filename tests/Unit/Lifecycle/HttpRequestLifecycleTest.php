@@ -31,7 +31,7 @@ final class HttpRequestLifecycleTest extends CodeIgniterTestCase
         $_SERVER['HTTP_USER_AGENT'] = 'PHPUnit';
 
         $client = new RecordingPerfbaseClient();
-        $request = $this->makeRequest('https://example.com/articles/42?secret=1');
+        $request = $this->makeRequest('https://example.com:8443/articles/42?page=2&secret=1');
         $request->setMethod('GET');
 
         $lifecycle = new HttpRequestLifecycle(
@@ -50,8 +50,11 @@ final class HttpRequestLifecycleTest extends CodeIgniterTestCase
 
         self::assertSame(['http'], $client->startedSpans);
         self::assertSame('GET articles/(:num)', $client->attributes['action']);
-        self::assertStringEndsWith('/articles/42', $client->attributes['http_url']);
-        self::assertStringNotContainsString('secret=1', $client->attributes['http_url']);
+        // CodeIgniter 4.3 re-derives the scheme from App::$baseURL, so accept either.
+        self::assertMatchesRegularExpression(
+            '#^https?://example\.com:8443/articles/42\?page=2&secret=REDACTED$#',
+            $client->attributes['http_url']
+        );
         self::assertSame('201', $client->attributes['http_status_code']);
         self::assertSame('http', $client->attributes['source']);
     }

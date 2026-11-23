@@ -16,12 +16,14 @@ class PerfbaseCommands extends Commands
      * implementation again before modifying it.
      *
      * @param array<int|string, string|null> $params
-     * @return int|void
+     * @return int
      */
     public function run(string $command, array $params)
     {
         if (!$this->verifyCommand($command, $this->commands)) {
-            return;
+            // Current CodeIgniter releases return EXIT_ERROR here; older ones returned
+            // nothing, which spark turned into a successful exit for a typo.
+            return EXIT_ERROR;
         }
 
         $className = $this->commands[$command]['class'];

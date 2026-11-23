@@ -49,6 +49,8 @@ final class PerfbaseInstallCommandTest extends CodeIgniterTestCase
             self::assertSame(3, preg_match_all("/'perfbase'/", $contents));
             if ($output !== '') {
                 self::assertStringContainsString('Perfbase install completed.', $output);
+                self::assertStringContainsString('Set perfbase.apiKey', $output);
+                self::assertStringNotContainsString('PERFBASE_API_KEY', $output);
             }
         } finally {
             @unlink($appPath . 'Config/Perfbase.php');

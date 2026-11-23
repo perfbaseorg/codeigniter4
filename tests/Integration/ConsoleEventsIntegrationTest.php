@@ -9,6 +9,7 @@ use Perfbase\CodeIgniter4\Tests\Support\CodeIgniterTestCase;
 use Perfbase\CodeIgniter4\Runtime\ActiveLifecycleRegistry;
 use Perfbase\CodeIgniter4\Runtime\PerfbaseCommands;
 use Perfbase\CodeIgniter4\Tests\Fixtures\Commands\FailingCommand;
+use Perfbase\CodeIgniter4\Tests\Fixtures\Commands\NestedCommand;
 use Perfbase\CodeIgniter4\Tests\Fixtures\Commands\SuccessfulCommand;
 use Perfbase\CodeIgniter4\Tests\Fixtures\RecordingPerfbaseClient;
 use Perfbase\CodeIgniter4\Tests\Fixtures\TestPerfbaseClientProvider;
@@ -83,6 +84,69 @@ final class ConsoleEventsIntegrationTest extends CodeIgniterTestCase
         }
     }
 
+    public function testNestedCommandIsProfiledAsPartOfTheOuterCommand(): void
+    {
+        $commands = service('commands');
+        self::assertInstanceOf(PerfbaseCommands::class, $commands);
+
+        $this->setCommandMap($commands, [
+            'test:nested' => [
+                'class' => NestedCommand::class,
+                'file' => __FILE__,
+                'group' => 'Tests',
+                'description' => 'nested',
+            ],
+            'test:ok' => [
+                'class' => SuccessfulCommand::class,
+                'file' => __FILE__,
+                'group' => 'Tests',
+                'description' => 'ok',
+            ],
+        ]);
+
+        self::assertSame(5, $commands->run('test:nested', []));
+
+        self::assertSame(['cli'], $this->client->startedSpans);
+        self::assertSame(['cli'], $this->client->stoppedSpans);
+        self::assertSame('test:nested', $this->client->attributes['action']);
+        self::assertSame('5', $this->client->attributes['exit_code']);
+        self::assertSame(1, $this->client->submitCalls);
+        self::assertNull($this->registry->getActiveConsoleLifecycle());
+
+        // The depth counter is balanced, so the next top-level command is profiled.
+        self::assertSame(17, $commands->run('test:ok', []));
+        self::assertSame(['cli', 'cli'], $this->client->startedSpans);
+        self::assertSame(2, $this->client->submitCalls);
+    }
+
+    public function testLongRunningCommandsAreExcludedByDefault(): void
+    {
+        $commands = service('commands');
+        self::assertInstanceOf(PerfbaseCommands::class, $commands);
+
+        $this->setCommandMap($commands, [
+            'queue:work' => [
+                'class' => SuccessfulCommand::class,
+                'file' => __FILE__,
+                'group' => 'Tests',
+                'description' => 'worker',
+            ],
+            'serve' => [
+                'class' => SuccessfulCommand::class,
+                'file' => __FILE__,
+                'group' => 'Tests',
+                'description' => 'server',
+            ],
+        ]);
+
+        self::assertSame(17, $commands->run('queue:work', []));
+        self::assertSame(17, $commands->run('serve', []));
+
+        self::assertSame([], $this->client->startedSpans);
+        self::assertSame(0, $this->client->submitCalls);
+        self::assertNull($this->registry->getActiveConsoleLifecycle());
+    }
+
     public function testSequentialCommandsDoNotLeakLifecycleState(): void
     {
         $commands = service('commands');
@@ -111,7 +175,6 @@ final class ConsoleEventsIntegrationTest extends CodeIgniterTestCase
     {
         $reflection = new \ReflectionClass($commands);
         $property = $reflection->getParentClass()->getProperty('commands');
-        $property->setAccessible(true);
         $property->setValue($commands, $map);
     }
 }

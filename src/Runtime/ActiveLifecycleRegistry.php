@@ -15,6 +15,8 @@ class ActiveLifecycleRegistry
 
     private ?ConsoleCommandLifecycle $activeConsoleLifecycle = null;
 
+    private int $consoleDepth = 0;
+
     public function setHttpLifecycle(RequestInterface $request, HttpRequestLifecycle $lifecycle): void
     {
         $this->httpLifecycles[spl_object_id($request)] = $lifecycle;
@@ -45,9 +47,32 @@ class ActiveLifecycleRegistry
         $this->activeConsoleLifecycle = null;
     }
 
+    /**
+     * Records that a Spark command started and returns the nesting depth.
+     * Commands invoked from another command (BaseCommand::call(), command())
+     * run at depth > 1 and belong to the outer command's trace.
+     */
+    public function enterConsoleCommand(): int
+    {
+        return ++$this->consoleDepth;
+    }
+
+    /**
+     * Records that a Spark command finished and returns the remaining depth.
+     */
+    public function leaveConsoleCommand(): int
+    {
+        if ($this->consoleDepth > 0) {
+            $this->consoleDepth--;
+        }
+
+        return $this->consoleDepth;
+    }
+
     public function reset(): void
     {
         $this->httpLifecycles = [];
         $this->activeConsoleLifecycle = null;
+        $this->consoleDepth = 0;
     }
 }

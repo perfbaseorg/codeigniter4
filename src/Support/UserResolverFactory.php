@@ -62,7 +62,6 @@ final class UserResolverFactory
             }
 
             $property = $reflection->getProperty('mocks');
-            $property->setAccessible(true);
             $mocks = $property->getValue();
 
             if (!is_array($mocks)) {
