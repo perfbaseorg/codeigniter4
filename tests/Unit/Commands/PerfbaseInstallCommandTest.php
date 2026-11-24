@@ -38,8 +38,11 @@ final class PerfbaseInstallCommandTest extends CodeIgniterTestCase
             };
 
             $output = $this->captureOutput(static function () use ($command): void {
-                self::assertSame(EXIT_SUCCESS, $command->run([]));
-                self::assertSame(EXIT_SUCCESS, $command->run([]));
+                $firstRun = $command->run([]);
+                $secondRun = $command->run([]);
+
+                self::assertSame(EXIT_SUCCESS, $firstRun);
+                self::assertSame(EXIT_SUCCESS, $secondRun);
             });
             self::assertFileExists($appPath . 'Config/Perfbase.php');
 

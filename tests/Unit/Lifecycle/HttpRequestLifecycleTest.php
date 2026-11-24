@@ -71,6 +71,7 @@ final class HttpRequestLifecycleTest extends CodeIgniterTestCase
         $lifecycle->startProfiling();
         self::assertSame([], $client->startedSpans);
 
+        $client = new RecordingPerfbaseClient();
         $config = $this->config();
         $config->excludeHttp = ['/admin'];
         $lifecycle = new HttpRequestLifecycle($request, new TestPerfbaseClientProvider($client), new ErrorHandler(false, false), $config);

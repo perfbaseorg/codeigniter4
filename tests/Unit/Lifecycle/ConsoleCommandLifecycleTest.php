@@ -45,6 +45,7 @@ final class ConsoleCommandLifecycleTest extends TestCase
         $lifecycle->startProfiling();
         self::assertSame([], $client->startedSpans);
 
+        $client = new RecordingPerfbaseClient();
         $config = $this->config();
         $config->excludeConsole = ['test:*'];
         $lifecycle = new ConsoleCommandLifecycle('test:ok', new TestPerfbaseClientProvider($client), new ErrorHandler(false, false), $config);
